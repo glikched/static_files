@@ -1,0 +1,40 @@
+#!/bin/bash
+
+#
+# This script downloads latest apk and extracts the magiskboot tools for arm64 and x86
+#
+
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+ver="$(cat "$DIR/magisk_version" 2>/dev/null || echo -n 'none')"
+
+if [ "x$1" = "xcanary" ]
+then
+	nver="canary"
+	magisk_link="https://github.com/topjohnwu/magisk_files/raw/${nver}/app-debug.apk"
+else
+	if [ "x$1" = "x" ]; then
+		nver="$(curl -s https://github.com/topjohnwu/Magisk/releases | grep -m 1 -Poe 'Magisk v[\d\.]+' | cut -d ' ' -f 2)"
+	else
+		nver="$1"
+	fi
+	magisk_link="https://github.com/topjohnwu/Magisk/releases/download/${nver}/Magisk-${nver}.apk"
+fi
+
+if [ \( -n "$nver" \) -a \( "$nver" != "$ver" \) -o ! \( -f "$DIR/magiskboot*" \) -o \( "$nver" = "canary" \) ]
+then
+	echo "Updating Magisk from $ver to $nver"
+	curl -s --output "$DIR/magisk.zip" -L "$magisk_link"
+	if fgrep 'Not Found' "$DIR/magisk.zip"; then
+		curl -s --output "$DIR/magisk.zip" -L "${magisk_link%.apk}.zip"
+	fi
+	unzip -o "$DIR/magisk.zip" lib/arm64-v8a/libmagiskboot.so lib/x86/libmagiskboot.so -d "$DIR"
+	mv -f "$DIR/lib/arm64-v8a/libmagiskboot.so" "$DIR/magiskboot-arm64"
+	mv -f "$DIR/lib/x86/libmagiskboot.so" "$DIR/magiskboot-x86"
+	echo -n "$nver" > "$DIR/magisk_version"
+	rm  -rf "$DIR/magisk.zip" lib
+else
+	echo "Nothing to be done: Magisk version $nver"
+fi
